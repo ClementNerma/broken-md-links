@@ -245,7 +245,12 @@ pub fn check_broken_links(path: &Path, dir: bool, ignore_header_links: bool, mut
                         None => (unsplit_target.into_string(), None)
                     };
 
-                    let target = path.parent().unwrap().join(Path::new(&target));
+                    let target = if !target.is_empty() {
+                        path.parent().unwrap().join(Path::new(&target))
+                    } else {
+                        path.to_owned()
+                    };
+                    
                     let target_canon = safe_canonicalize(&target);
 
                     if !target.exists() {
