@@ -43,6 +43,18 @@ use std::path::{Path, PathBuf, Component};
 use std::collections::HashMap;
 use log::{trace, debug, info, warn, error};
 use pulldown_cmark::{Parser, Options, Event, Tag, LinkType};
+use lazy_static::lazy_static;
+use regex::Regex;
+
+lazy_static! {
+    static ref EMAIL_REGEX: Regex = Regex::new("\
+        (?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|\"\
+        (?:[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f\\x21\\x23-\\x5b\\x5d-\\x7f]|\\\\[\\x01-\\x09\\x0b\\x0c\\x0e-\\x7f])*\")@\
+        (?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\\[\
+        (?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\\.){3}(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9-]*[a-z0-9]:\
+        (?:[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f\\x21-\\x5a\\x53-\\x7f]|\\\\[\\x01-\\x09\\x0b\\x0c\\x0e-\\x7f])+)\\])"
+    ).unwrap();
+}
 
 /// Canonicalize a path and display it as a lossy string
 /// 
@@ -234,7 +246,7 @@ pub fn check_broken_links(path: &Path, dir: bool, ignore_header_links: bool, mut
         for event in parser {
             // Check links only
             if let Event::End(Tag::Link(link_type, unsplit_target, _)) = event {
-                // Check inline links only (not URLs or e-mail addresses for instance)
+                // Check inline links only (not URLs or e-mail addresses in autolinks for instance)
                 if let LinkType::Inline = link_type {
                     // Get the link's target file and optionally its header
                     let (target, header): (String, Option<String>) = match unsplit_target.chars().position(|c| c == '#') {
@@ -244,6 +256,17 @@ pub fn check_broken_links(path: &Path, dir: bool, ignore_header_links: bool, mut
                         ),
                         None => (unsplit_target.into_string(), None)
                     };
+
+                    // Don't care about URLs
+                    if target.starts_with("http://") || target.starts_with("https://") || target.starts_with("ftp://") {
+                        trace!("In '{}': found link to URL: {}", canon, target);
+                        continue ;
+                    }
+
+                    if EMAIL_REGEX.is_match(&target) {
+                        trace!("In '{}': found link to e-mail addres: {}", canon, target);
+                        continue ;
+                    }
 
                     let target = if !target.is_empty() {
                         path.parent().unwrap().join(Path::new(&target))
