@@ -269,7 +269,11 @@ pub fn check_broken_links(path: &Path, dir: bool, ignore_header_links: bool, mut
                                     errors += 1;
                                 } else {
                                     debug!("In '{}': now checking link '{}' from file '{}'", canon, header, target_canon);
-                                
+
+                                    // Canonicalize properly the target path to avoid irregularities in cache's keys
+                                    //  like 'dir/../file.md' and 'file.md' which are identical but do not have the same Path representation
+                                    let target = target.canonicalize().unwrap();
+
                                     // If the target file is not already in cache...
                                     if !links_cache.contains_key(&target) {
                                         // 2. Push all slugs in the cache
