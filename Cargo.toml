@@ -3,7 +3,6 @@ name = "broken-md-links"
 version = "0.1.0"
 authors = ["Clément Nerma <clement.nerma@gmail.com>"]
 edition = "2018"
-path = "src/lib.rs"
 
 [dependencies]
 pulldown-cmark = { version = "0.7", default-features = false, features = ["simd"] }
