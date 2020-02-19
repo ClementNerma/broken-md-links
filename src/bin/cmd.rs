@@ -19,8 +19,8 @@ struct Command {
     #[clap(long = "ignore-header-links", help = "Do not check if headers are valids in links (e.g. 'document.md#some-header')")]
     pub ignore_header_links: bool,
 
-    #[clap(short = "v", long = "verbosity", possible_values=&["silent", "errors", "normal", "verbose", "debug"],
-           default_value="normal", help = "Verbosity level")]
+    #[clap(short = "v", long = "verbosity", possible_values=&["silent", "errors", "warn", "info", "verbose", "debug"],
+           default_value="errors", help = "Verbosity level")]
     pub verbosity: String
 }
 
@@ -78,12 +78,13 @@ fn main() {
     let args: Command = Command::parse();
 
     logger(match args.verbosity.as_str() {
-        "silent" => LevelFilter::Off,
-        "errors" => LevelFilter::Error,
-        "normal" => LevelFilter::Info,
+        "silent"  => LevelFilter::Off,
+        "errors"  => LevelFilter::Error,
+        "warn"    => LevelFilter::Warn,
+        "info"    => LevelFilter::Info,
         "verbose" => LevelFilter::Debug,
-        "debug" => LevelFilter::Trace,
-        _ => unreachable!()
+        "debug"   => LevelFilter::Trace,
+        _         => unreachable!()
     });
 
     let input = Path::new(&args.input);

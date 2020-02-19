@@ -17,10 +17,16 @@ Check a whole directory:
 broken-md-links dir/ -r
 ```
 
-Detailed informations can be displayed with `-v verbose`.
-Debug informations can be displayed with `-v trace`.
-Informations messages and warnings can be hidden to only show errors with `-v errors`.
-Output can be turned off with `-v silent` (exit code will be 0 if there was no broken link).
+### Output
+
+There are several levels of verbosity:
+
+* `-v silent`: display nothing (exit code will be 0 if there was no broken link)
+* `-v errors`: display errors only
+* `-v warn`: display errors and warnings (the default)
+* `-v info`: display the list of analyzed files as well
+* `-v verbose`: display detailed informations
+* `-v trace`: display debug informations
 
 ## Library usage
 
