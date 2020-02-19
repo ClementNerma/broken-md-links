@@ -3,9 +3,14 @@ name = "broken-md-links"
 version = "0.1.0"
 authors = ["Clément Nerma <clement.nerma@gmail.com>"]
 edition = "2018"
+path = "src/lib.rs"
 
 [dependencies]
 pulldown-cmark = { version = "0.7", default-features = false, features = ["simd"] }
 clap = { git = "https://github.com/clap-rs/clap/" }
 log = "0.4.8"
 fern = { version = "0.5.9", features = [ "colored" ] }
+
+[[bin]]
+name = "broken-md-links"
+path = "src/bin/cmd.rs"
