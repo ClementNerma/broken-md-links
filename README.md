@@ -35,9 +35,9 @@ use broken_md_links::check_broken_links;
 
 fn main() {
   match check_broken_links(Path::new("file.md"), false, false, &mut HashMap::new()) {
-    Ok(0) => println!("No broken link :D"),
+    Ok(0)          => println!("No broken link :D"),
     Ok(errors @ _) => println!("There are {} broken links :(", errors),
-    Err(err) => println!("Something went wrong :( : {}", err)
+    Err(err)       => println!("Something went wrong :( : {}", err)
   }
 }
 ```
