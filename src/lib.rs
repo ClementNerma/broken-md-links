@@ -130,6 +130,9 @@ pub fn generate_slugs(path: &Path) -> Result<Vec<String>, String> {
     // The list of slugified headers
     let mut headers = vec![];
 
+    // Counter of slugs for suffixes
+    let mut header_counts = HashMap::<String, usize>::new();
+
     // When the 'pulldown_cmark' library encounters a heading, the title is only made available in the next event
     // This boolean is set to `true` when an heading appears, to indicate the next event is expected to be the related title
     let mut get_header = false;
@@ -142,10 +145,22 @@ pub fn generate_slugs(path: &Path) -> Result<Vec<String>, String> {
         if get_header {
             // If we indeed get a piece of text (not a paragraph)...
             if let Event::Text(header) = &event {
-                // Get its slug and push it to the list of this file's headers
+                // Get its slug
                 let slug = slugify(&header);
                 debug!("In '{}': found header: #{}", canon, slug);
-                headers.push(slug);
+
+                // Get the number of duplicates this slug has
+                let duplicates = header_counts
+                    .entry(slug.clone())
+                    .and_modify(|d| *d += 1)
+                    .or_insert(0);
+
+                // Add a suffix for duplicates
+                if *duplicates > 0 {
+                    headers.push(format!("{}-{}", slug, duplicates));
+                } else {
+                    headers.push(slug);
+                }
             } else {
                 // We did not get a piece of text, which means this heading does not have a title
                 warn!("In '{}': heading was not directly followed by a title", canon);
