@@ -1,4 +1,7 @@
-//! A library and command-line tool for detecting broken links in Markdown files
+//! A library and command-line tool for detecting broken links in Markdown files.
+//! 
+//! By default, this tool detects broken links like "[foo](file.md)" (target file does not exist)
+//! and broken header links like "[foo](file.md#header)" (target file exists but specific header does not exist)
 //! 
 //! ## Command-line usage
 //! 
