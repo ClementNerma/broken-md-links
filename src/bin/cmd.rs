@@ -2,7 +2,7 @@ use std::time::Instant;
 use std::path::Path;
 use std::collections::HashMap;
 use clap::Clap;
-use log::{Level, LevelFilter, info, error};
+use log::{Level, LevelFilter, info, warn, error};
 use fern::colors::{ColoredLevelConfig, Color};
 use broken_md_links::check_broken_links;
 
@@ -21,7 +21,10 @@ struct Command {
 
     #[clap(short = "v", long = "verbosity", possible_values=&["silent", "errors", "warn", "info", "verbose", "debug"],
            default_value="errors", help = "Verbosity level")]
-    pub verbosity: String
+    pub verbosity: String,
+
+    #[clap(long = "no-error", help = "Convert all broken/invalid links errors to warnings")]
+    pub no_error: bool
 }
 
 /// Start the logger, hiding every message whose level is under the provided one
@@ -99,6 +102,7 @@ fn main() {
 
     match check_broken_links(input, args.recursive, args.ignore_header_links, &mut HashMap::new()) {
         Ok(0) => info!("OK."),
+        Ok(errors @ _) if args.no_error => warn!("Found {} broken or invalid links!", errors),
         Ok(errors @ _) => fail(&format!("Found {} broken or invalid links!", errors)),
         Err(err) => fail(&err)
     }
