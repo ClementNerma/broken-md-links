@@ -235,13 +235,11 @@ pub fn check_broken_links(path: &Path, dir: bool, ignore_header_links: bool, no_
     // Get the canonicalized path for display
     let canon = safe_canonicalize(path);
 
-    debug!("Analyzing directory: {}", canon);
-
     // Count errors
     let mut errors = 0;
 
     if dir {
-        // Treat input as a directory
+        debug!("Analyzing directory: {}", canon);
 
         for item in path.read_dir().map_err(|err| format!("Failed to read input directory at '{}': {}", canon, err))? {
             let item = item.map_err(|err| format!("Failed to get item from directory at '{}': {}", canon, err))?;
