@@ -138,9 +138,9 @@ pub fn generate_slugs(path: &Path) -> Result<Vec<String>, String> {
     // Counter of slugs for suffixes
     let mut header_counts = HashMap::<String, usize>::new();
 
-    // When the 'pulldown_cmark' library encounters a heading, the title is only made available in the next event
-    // This boolean is set to `true` when an heading appears, to indicate the next event is expected to be the related title
-    let mut get_header = false;
+    // When the 'pulldown_cmark' library encounters a heading, the actual title can be got between a Start() and an End() events
+    // This variable contains the pending title's content
+    let mut header: Option<String> = None;
 
     // Create a pull-down markdown parser
     let parser = Parser::new_ext(&content, Options::all());
@@ -155,40 +155,47 @@ pub fn generate_slugs(path: &Path) -> Result<Vec<String>, String> {
         }
 
         // If the last event was an heading, we are now expecting to get its title
-        if get_header {
-            // If we indeed get a piece of text (not a paragraph)...
-            if let Event::Text(header) = &event {
-                // Get its slug
-                let slug = slugify(&header);
-                debug!("{}", format_msg!("found header: #{}", slug));
+        if let Some(ref mut header_str) = header {
+            match event {
+                // Event indicating the header is now complete
+                Event::End(Tag::Heading(_)) => {
+                    // Get its slug
+                    let slug = slugify(&header_str);
+                    debug!("{}", format_msg!("found header: #{}", slug));
 
-                // Get the number of duplicates this slug has
-                let duplicates = header_counts
-                    .entry(slug.clone())
-                    .and_modify(|d| *d += 1)
-                    .or_insert(0);
+                    // Print a warning if the title is empty
+                    if header_str.trim().len() == 0 {
+                        // We did not get a piece of text, which means this heading does not have a title
+                        warn!("{}", format_msg!("heading was not directly followed by a title"));
+                        trace!("Faulty event: {:?}", event);
+                    }
 
-                // Add a suffix for duplicates
-                if *duplicates > 0 {
-                    headers.push(format!("{}-{}", slug, duplicates));
-                } else {
-                    headers.push(slug);
-                }
-            } else {
-                // We did not get a piece of text, which means this heading does not have a title
-                warn!("{}", format_msg!("heading was not directly followed by a title"));
-                trace!("Faulty event: {:?}", event);
+                    // Get the number of duplicates this slug has
+                    let duplicates = header_counts
+                        .entry(slug.clone())
+                        .and_modify(|d| *d += 1)
+                        .or_insert(0);
+
+                    // Add a suffix for duplicates
+                    if *duplicates > 0 {
+                        headers.push(format!("{}-{}", slug, duplicates));
+                    } else {
+                        headers.push(slug);
+                    }
+
+                    // Header is now complete
+                    header = None;
+                },
+
+                Event::Start(_) | Event::End(_) | Event::SoftBreak | Event::HardBreak | Event::Rule | Event::TaskListMarker(_) => {},
+                Event::Text(text) | Event::Code(text) | Event::Html(text) | Event::FootnoteReference(text) => header_str.push_str(&text)
             }
-
-            // Disable the title expectation
-            get_header = false;
-
         }
-
-        // If we encounted an heading...
-        if let Event::Start(Tag::Heading(_)) = event {
+        
+        // If we encounted the beginning of a heading...
+        else if let Event::Start(Tag::Heading(_)) = event {
             // Expect to get the related title just after
-            get_header = true;
+            header = Some(String::new())
         }
     }
 
