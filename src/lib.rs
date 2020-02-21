@@ -28,13 +28,15 @@
 //! * `-v verbose`: display detailed informations
 //! * `-v trace`: display debug informations
 //!
+//! Additionally, the `--no-error` flag converst all broken/invalid link errors to warnings.
+//!
 //! ## Library usage
 //! 
 //! ```
 //! use broken_md_links::check_broken_links;
 //! 
 //! fn main() {
-//!   match check_broken_links(Path::new("file.md"), false, false, &mut HashMap::new()) {
+//!   match check_broken_links(Path::new("file.md"), false, false, false, &mut HashMap::new()) {
 //!     Ok(0) => println!("No broken link :D"),
 //!     Ok(errors @ _) => println!("There are {} broken links :(", errors),
 //!     Err(err) => println!("Something went wrong :( : {}", err)
@@ -198,6 +200,8 @@ pub fn generate_slugs(path: &Path) -> Result<Vec<String>, String> {
 /// This cache is shared recursively through the `links_cache` argument. As it uses a specific format, it's recommanded to just pass a mutable
 ///  reference to an empty HashMap to this function, and not build your own one which may cause detection problems.
 /// 
+/// If the `no_errors` parameter is set, all broken/invalid link errors will be displayed as simple warnings (but errors will still be counted).
+/// 
 /// The function returns an error is something goes wrong, or else the number of broken and invalid (without target) links.
 /// 
 /// # Examples
@@ -208,7 +212,18 @@ pub fn generate_slugs(path: &Path) -> Result<Vec<String>, String> {
 /// 
 /// // Directory
 /// assert_eq(check_broken_links(Path::new("dir/"), true, false, &mut HashMap::new()), Ok(0), "There are broken/invalid links :(");
-pub fn check_broken_links(path: &Path, dir: bool, ignore_header_links: bool, mut links_cache: &mut HashMap<PathBuf, Vec<String>>) -> Result<u64, String> {
+pub fn check_broken_links(path: &Path, dir: bool, ignore_header_links: bool, no_errors: bool, mut links_cache: &mut HashMap<PathBuf, Vec<String>>) -> Result<u64, String> {
+    /// Display a broken/invalid link error
+    macro_rules! err_or_warn {
+        ($($arg: expr),*) => {
+            if no_errors {
+                warn!($($arg),*);
+            } else {
+                error!($($arg),*);
+            }
+        }
+    }
+
     // Get the canonicalized path for display
     let canon = safe_canonicalize(path);
 
@@ -227,14 +242,14 @@ pub fn check_broken_links(path: &Path, dir: bool, ignore_header_links: bool, mut
 
             if file_type.is_dir() {
                 // Check broken links recursively
-                errors += check_broken_links(&path, true, ignore_header_links, &mut links_cache)?;
+                errors += check_broken_links(&path, true, ignore_header_links, no_errors,&mut links_cache)?;
             } else if file_type.is_file() {
                 // Only check ".md" files
                 if let Some(ext) = path.extension() {
                     if let Some(ext) = ext.to_str() {
                         if ext == "md" {
                             // Check this Markdown file
-                            errors += check_broken_links(&path, false, ignore_header_links, links_cache)?;
+                            errors += check_broken_links(&path, false, ignore_header_links, no_errors,links_cache)?;
                         }
                     }
                 }
@@ -254,7 +269,7 @@ pub fn check_broken_links(path: &Path, dir: bool, ignore_header_links: bool, mut
         // Count links without a target (like `[link name]`) as an error
         // TODO: Find a way to not have to specify such a long explicit type name
         let handle_missing_link_targets: &dyn for<'r, 's> Fn(&'r str, &'s str) -> Option<(String, String)> = &|link, _| {
-            error!("In '{}': Missing target for link '{}'", canon, link);
+            err_or_warn!("In '{}': Missing target for link '{}'", canon, link);
             None
         };
 
@@ -295,7 +310,7 @@ pub fn check_broken_links(path: &Path, dir: bool, ignore_header_links: bool, mut
                     let target_canon = safe_canonicalize(&target);
 
                     if !target.exists() {
-                        error!("In '{}': Broken link found: path '{}' does not exist", canon, target_canon);
+                        err_or_warn!("In '{}': Broken link found: path '{}' does not exist", canon, target_canon);
                         errors += 1;
                     } else {
                         trace!("In '{}': valid link found: {}", canon, target_canon);
@@ -306,7 +321,7 @@ pub fn check_broken_links(path: &Path, dir: bool, ignore_header_links: bool, mut
                             if let Some(header) = header {
                                 // Then the target must be a file
                                 if !target.is_file() {
-                                    error!("In '{}': Invalid header link found: path '{}' exists but is not a file", canon, target_canon);
+                                    err_or_warn!("In '{}': Invalid header link found: path '{}' exists but is not a file", canon, target_canon);
                                     errors += 1;
                                 } else {
                                     debug!("In '{}': now checking link '{}' from file '{}'", canon, header, target_canon);
@@ -330,7 +345,7 @@ pub fn check_broken_links(path: &Path, dir: bool, ignore_header_links: bool, mut
 
                                     // Ensure the link points to an existing header
                                     if !slugs.contains(&header) {
-                                        error!("In '{}': Broken link found: header '{}' not found in '{}'", canon, header, target_canon);
+                                        err_or_warn!("In '{}': Broken link found: header '{}' not found in '{}'", canon, header, target_canon);
                                     } else {
                                         trace!("In '{}': valid header link found: {}", canon, header);
                                     }

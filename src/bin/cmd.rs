@@ -100,7 +100,7 @@ fn main() {
         fail("Input is not a directory but '-r' / '--recursive' option was supplied");
     }
 
-    match check_broken_links(input, args.recursive, args.ignore_header_links, &mut HashMap::new()) {
+    match check_broken_links(input, args.recursive, args.ignore_header_links, args.no_error, &mut HashMap::new()) {
         Ok(0) => info!("OK."),
         Ok(errors @ _) if args.no_error => warn!("Found {} broken or invalid links!", errors),
         Ok(errors @ _) => fail(&format!("Found {} broken or invalid links!", errors)),
