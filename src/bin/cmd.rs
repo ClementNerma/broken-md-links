@@ -20,7 +20,7 @@ struct Command {
     pub ignore_header_links: bool,
 
     #[clap(short = "v", long = "verbosity", possible_values=&["silent", "errors", "warn", "info", "verbose", "debug"],
-           default_value="errors", help = "Verbosity level")]
+           default_value="warn", help = "Verbosity level")]
     pub verbosity: String,
 
     #[clap(long = "no-error", help = "Convert all broken/invalid links errors to warnings")]
