@@ -112,7 +112,7 @@ pub fn slugify(header: &str) -> String {
     header
         .chars()
         .map(|c| if c == ' ' { '-' } else { c })
-        .filter(|c| c.is_ascii_alphanumeric() || *c == '-')
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
         .collect::<String>()
         .to_lowercase()
 }
