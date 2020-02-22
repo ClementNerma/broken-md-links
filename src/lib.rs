@@ -368,6 +368,7 @@ pub fn check_broken_links(path: &Path, dir: bool, ignore_header_links: bool, no_
                                     // Ensure the link points to an existing header
                                     if !slugs.contains(&header) {
                                         err_or_warn!("{}", format_msg!("broken link found: header '{}' not found in '{}'", header, target_canon));
+                                        errors += 1;
                                     } else {
                                         trace!("{}", format_msg!("valid header link found: {}", header));
                                     }
