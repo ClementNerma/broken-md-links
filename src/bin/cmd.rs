@@ -102,8 +102,15 @@ fn main() {
 
     match check_broken_links(input, args.recursive, args.ignore_header_links, args.no_error, &mut HashMap::new()) {
         Ok(0) => info!("OK."),
-        Ok(errors @ _) if args.no_error => warn!("Found {} broken or invalid links!", errors),
-        Ok(errors @ _) => fail(&format!("Found {} broken or invalid links!", errors)),
+        Ok(errors @ _) => {
+            let message = format!("Found {} broken or invalid link{}!", errors, if errors > 1 { "s" } else { "" });
+
+            if args.no_error {
+                warn!("{}", message);
+            } else {
+                fail(&message);
+            }
+        },
         Err(err) => fail(&err)
     }
 }
