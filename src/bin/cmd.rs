@@ -10,20 +10,20 @@ use broken_md_links::check_broken_links;
 #[derive(Clap)]
 #[clap(version = "1.0", author = "Clément Nerma <clement.nerma@gmail.com>", about = "Detect broken links in markdown files")]
 struct Command {
-    #[clap(index = 1, help = "Input file or directory")]
+    #[clap(index = 1, about = "Input file or directory")]
     pub input: String,
 
-    #[clap(short = "r", long = "recursive", help = "Check all files in the input directory")]
+    #[clap(short = "r", long = "recursive", about = "Check all files in the input directory")]
     pub recursive: bool,
 
-    #[clap(long = "ignore-header-links", help = "Do not check if headers are valids in links (e.g. 'document.md#some-header')")]
+    #[clap(long = "ignore-header-links", about = "Do not check if headers are valids in links (e.g. 'document.md#some-header')")]
     pub ignore_header_links: bool,
 
     #[clap(short = "v", long = "verbosity", possible_values=&["silent", "errors", "warn", "info", "verbose", "debug"],
-           default_value="warn", help = "Verbosity level")]
+           default_value="warn", about = "Verbosity level")]
     pub verbosity: String,
 
-    #[clap(long = "no-error", help = "Convert all broken/invalid links errors to warnings")]
+    #[clap(long = "no-error", about = "Convert all broken/invalid links errors to warnings")]
     pub no_error: bool
 }
 
