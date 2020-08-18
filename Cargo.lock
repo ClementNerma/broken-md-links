@@ -34,9 +34,10 @@ checksum = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
 
 [[package]]
 name = "broken-md-links"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "clap",
+ "colored",
  "fern",
  "lazy_static",
  "log",
@@ -84,9 +85,9 @@ dependencies = [
 
 [[package]]
 name = "colored"
-version = "1.9.2"
+version = "1.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8815e2ab78f3a59928fc32e141fbeece88320a240e43f47b2fd64ea3a88a5b3d"
+checksum = "f4ffc801dacf156c5854b9df4f425a626539c3a6ef7893cc0c5084a23f0b6c59"
 dependencies = [
  "atty",
  "lazy_static",

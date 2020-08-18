@@ -2,7 +2,7 @@
 name = "broken-md-links"
 description = "A command-line tool and library to detect broken links in Markdown files"
 license = "Apache-2.0"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Clément Nerma <clement.nerma@gmail.com>"]
 edition = "2018"
 repository = "https://github.com/ClementNerma/broken-md-links"
@@ -14,6 +14,7 @@ log = "0.4.8"
 fern = { version = "0.6.0", features = [ "colored" ] }
 regex = "1.3.9"
 lazy_static = "1.4.0"
+colored = "1.9.3"
 
 [[bin]]
 name = "broken-md-links"

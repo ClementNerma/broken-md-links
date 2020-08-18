@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use clap::Clap;
 use log::{Level, LevelFilter, info, warn, error};
 use fern::colors::{ColoredLevelConfig, Color};
+use colored::Colorize;
 use broken_md_links::check_broken_links;
 
 /// Command
@@ -60,7 +61,7 @@ fn logger(level: LevelFilter) {
                     Level::Debug => "VERBOSE",
                     Level::Trace => "DEBUG"
                 },
-                message
+                format!("{}", message).red()
             ))
         })
         .level(level)

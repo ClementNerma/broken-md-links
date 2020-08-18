@@ -50,6 +50,7 @@ use log::{trace, debug, info, warn, error};
 use pulldown_cmark::{Parser, Options, Event, Tag, LinkType};
 use lazy_static::lazy_static;
 use regex::Regex;
+use colored::Colorize;
 
 lazy_static! {
     static ref EMAIL_REGEX: Regex = Regex::new("\
@@ -128,7 +129,7 @@ pub fn generate_slugs(path: &Path) -> Result<Vec<String>, String> {
 
     // Read the input file
     let content = std::fs::read_to_string(path)
-        .map_err(|err| format!("Failed to read file at '{}': {}", canon, err))?;
+        .map_err(|err| format!("Failed to read file at '{}': {}", canon.green(), err))?;
 
     trace!("In '{}': just read file, which is {} bytes long.", canon, content.len());
 
@@ -150,7 +151,7 @@ pub fn generate_slugs(path: &Path) -> Result<Vec<String>, String> {
             ($($param: expr),*) => {{
                 // TODO: Optimize the computation of the line number
                 let line = content.chars().take(range.start).filter(|c| *c == '\n').count();
-                format!("In '{}', line {}: {}", canon, line + 1, format!($($param),*))
+                format!("In '{}', line {}: {}", canon.green(), (line + 1).to_string().bright_magenta(), format!($($param),*))
             }}
         }
 
@@ -248,10 +249,10 @@ pub fn check_broken_links(path: &Path, dir: bool, ignore_header_links: bool, no_
     if dir {
         debug!("Analyzing directory: {}", canon);
 
-        for item in path.read_dir().map_err(|err| format!("Failed to read input directory at '{}': {}", canon, err))? {
-            let item = item.map_err(|err| format!("Failed to get item from directory at '{}': {}", canon, err))?;
+        for item in path.read_dir().map_err(|err| format!("Failed to read input directory at '{}': {}", canon.green(), err))? {
+            let item = item.map_err(|err| format!("Failed to get item from directory at '{}': {}", canon.green(), err))?;
             let path = item.path();
-            let file_type = item.file_type().map_err(|err| format!("Failed to read file type of item at '{}': {}", canon, err))?;
+            let file_type = item.file_type().map_err(|err| format!("Failed to read file type of item at '{}': {}", canon.green(), err))?;
 
             if file_type.is_dir() {
                 // Check broken links recursively
@@ -275,14 +276,14 @@ pub fn check_broken_links(path: &Path, dir: bool, ignore_header_links: bool, no_
         info!("Analyzing: {}", canon);
 
         let content = std::fs::read_to_string(path)
-            .map_err(|err| format!("Failed to read file at '{}': {}", canon, err))?;
+            .map_err(|err| format!("Failed to read file at '{}': {}", canon.green(), err))?;
 
         trace!("In '{}': just read file, which is {} bytes long.", canon, content.len());
 
         // Count links without a target (like `[link name]`) as an error
         // TODO: Find a way to not have to specify such a long explicit type name
         let handle_missing_link_targets: &dyn for<'r, 's> Fn(&'r str, &'s str) -> Option<(String, String)> = &|link, _| {
-            err_or_warn!("In '{}': Missing target for link '{}'", canon, link);
+            err_or_warn!("In '{}': Missing target for link '{}'", canon.green(), link.yellow());
             None
         };
 
@@ -294,7 +295,7 @@ pub fn check_broken_links(path: &Path, dir: bool, ignore_header_links: bool, no_
                 ($($param: expr),*) => {{
                     // TODO: Optimize the computation of the line number
                     let line = content.chars().take(range.start).filter(|c| *c == '\n').count();
-                    format!("In '{}', line {}: {}", canon, line + 1, format!($($param),*))
+                    format!("In '{}', line {}: {}", canon.green(), line + 1, format!($($param),*))
                 }}
             }
 
@@ -331,7 +332,7 @@ pub fn check_broken_links(path: &Path, dir: bool, ignore_header_links: bool, no_
                     let target_canon = safe_canonicalize(&target);
 
                     if !target.exists() {
-                        err_or_warn!("{}", format_msg!("broken link found: path '{}' does not exist", target_canon));
+                        err_or_warn!("{}", format_msg!("broken link found: path '{}' does not exist", target_canon.green()));
                         errors += 1;
                     } else {
                         trace!("{}", format_msg!("valid link found: {}", target_canon));
@@ -342,7 +343,7 @@ pub fn check_broken_links(path: &Path, dir: bool, ignore_header_links: bool, no_
                             if let Some(header) = header {
                                 // Then the target must be a file
                                 if !target.is_file() {
-                                    err_or_warn!("{}", format_msg!("invalid header link found: path '{}' exists but is not a file", target_canon));
+                                    err_or_warn!("{}", format_msg!("invalid header link found: path '{}' exists but is not a file", target_canon.green()));
                                     errors += 1;
                                 } else {
                                     debug!("{}", format_msg!("now checking link '{}' from file '{}'", header, target_canon));
@@ -358,7 +359,7 @@ pub fn check_broken_links(path: &Path, dir: bool, ignore_header_links: bool, no_
                                             // 1. Get all its headers as slugs
                                             // We do not use the fully canonicalized path to not force displaying an absolute path
                                             generate_slugs(&target)
-                                                .map_err(|err| format!("failed to generate slugs for file '{}': {}", target_canon, err))?
+                                                .map_err(|err| format!("failed to generate slugs for file '{}': {}", target_canon.green(), err))?
                                         );
                                     }
 
@@ -367,7 +368,7 @@ pub fn check_broken_links(path: &Path, dir: bool, ignore_header_links: bool, no_
 
                                     // Ensure the link points to an existing header
                                     if !slugs.contains(&header) {
-                                        err_or_warn!("{}", format_msg!("broken link found: header '{}' not found in '{}'", header, target_canon));
+                                        err_or_warn!("{}", format_msg!("broken link found: header '{}' not found in '{}'", header.yellow(), target_canon.green()));
                                         errors += 1;
                                     } else {
                                         trace!("{}", format_msg!("valid header link found: {}", header));
