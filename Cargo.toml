@@ -9,7 +9,7 @@ repository = "https://github.com/ClementNerma/broken-md-links"
 
 [dependencies]
 pulldown-cmark = { version = "0.8.0", default-features = false, features = ["simd"] }
-clap = "3.0.0-beta.1"
+clap = "3.0.0-beta.2"
 log = "0.4.11"
 fern = { version = "0.6.0", features = [ "colored" ] }
 regex = "1.4.1"

@@ -19,7 +19,7 @@ struct Command {
     pub input: String,
 
     #[clap(
-        short = "r",
+        short = 'r',
         long = "recursive",
         about = "Check all files in the input directory"
     )]
@@ -31,7 +31,7 @@ struct Command {
     )]
     pub ignore_header_links: bool,
 
-    #[clap(short = "v", long = "verbosity", possible_values=&["silent", "errors", "warn", "info", "verbose", "debug"],
+    #[clap(short = 'v', long = "verbosity", possible_values=&["silent", "errors", "warn", "info", "verbose", "debug"],
            default_value="warn", about = "Verbosity level")]
     pub verbosity: String,
 
