@@ -1,31 +1,45 @@
-use std::time::Instant;
-use std::path::Path;
-use std::collections::HashMap;
-use clap::Clap;
-use log::{Level, LevelFilter, info, warn, error};
-use fern::colors::{ColoredLevelConfig, Color};
-use colored::Colorize;
 use broken_md_links::check_broken_links;
+use clap::Clap;
+use colored::Colorize;
+use fern::colors::{Color, ColoredLevelConfig};
+use log::{error, info, warn, Level, LevelFilter};
+use std::collections::HashMap;
+use std::path::Path;
+use std::time::Instant;
 
 /// Command
 #[derive(Clap)]
-#[clap(version = "1.0", author = "Clément Nerma <clement.nerma@gmail.com>", about = "Detect broken links in markdown files")]
+#[clap(
+    version = "1.0",
+    author = "Clément Nerma <clement.nerma@gmail.com>",
+    about = "Detect broken links in markdown files"
+)]
 struct Command {
     #[clap(index = 1, about = "Input file or directory")]
     pub input: String,
 
-    #[clap(short = "r", long = "recursive", about = "Check all files in the input directory")]
+    #[clap(
+        short = "r",
+        long = "recursive",
+        about = "Check all files in the input directory"
+    )]
     pub recursive: bool,
 
-    #[clap(long = "ignore-header-links", about = "Do not check if headers are valids in links (e.g. 'document.md#some-header')")]
+    #[clap(
+        long = "ignore-header-links",
+        about = "Do not check if headers are valids in links (e.g. 'document.md#some-header')"
+    )]
     pub ignore_header_links: bool,
 
     #[clap(short = "v", long = "verbosity", possible_values=&["silent", "errors", "warn", "info", "verbose", "debug"],
            default_value="warn", about = "Verbosity level")]
     pub verbosity: String,
 
-    #[clap(long = "no-error", about = "Convert all broken/invalid links errors to warnings")]
-    pub no_error: bool
+    #[clap(
+        long = "no-error",
+        about = "Convert all broken/invalid links errors to warnings"
+    )]
+    pub no_error: bool,
 }
 
 /// Start the logger, hiding every message whose level is under the provided one
@@ -50,7 +64,10 @@ fn logger(level: LevelFilter) {
 
             out.finish(format_args!(
                 "{}[{: >2}m {: >2}.{:03}s] {}: {}",
-                format_args!("\x1B[{}m", colors_line.get_color(&record.level()).to_fg_str()),
+                format_args!(
+                    "\x1B[{}m",
+                    colors_line.get_color(&record.level()).to_fg_str()
+                ),
                 secs / 60,
                 secs % 60,
                 elapsed.subsec_millis(),
@@ -59,7 +76,7 @@ fn logger(level: LevelFilter) {
                     Level::Warn => "WARNING",
                     Level::Error => "ERROR",
                     Level::Debug => "VERBOSE",
-                    Level::Trace => "DEBUG"
+                    Level::Trace => "DEBUG",
                 },
                 format!("{}", message).red()
             ))
@@ -82,13 +99,13 @@ fn main() {
     let args: Command = Command::parse();
 
     logger(match args.verbosity.as_str() {
-        "silent"  => LevelFilter::Off,
-        "errors"  => LevelFilter::Error,
-        "warn"    => LevelFilter::Warn,
-        "info"    => LevelFilter::Info,
+        "silent" => LevelFilter::Off,
+        "errors" => LevelFilter::Error,
+        "warn" => LevelFilter::Warn,
+        "info" => LevelFilter::Info,
         "verbose" => LevelFilter::Debug,
-        "debug"   => LevelFilter::Trace,
-        _         => unreachable!()
+        "debug" => LevelFilter::Trace,
+        _ => unreachable!(),
     });
 
     let input = Path::new(&args.input);
@@ -101,17 +118,27 @@ fn main() {
         fail("Input is not a directory but '-r' / '--recursive' option was supplied");
     }
 
-    match check_broken_links(input, args.recursive, args.ignore_header_links, args.no_error, &mut HashMap::new()) {
+    match check_broken_links(
+        input,
+        args.recursive,
+        args.ignore_header_links,
+        args.no_error,
+        &mut HashMap::new(),
+    ) {
         Ok(0) => info!("OK."),
         Ok(errors @ _) => {
-            let message = format!("Found {} broken or invalid link{}!", errors, if errors > 1 { "s" } else { "" });
+            let message = format!(
+                "Found {} broken or invalid link{}!",
+                errors,
+                if errors > 1 { "s" } else { "" }
+            );
 
             if args.no_error {
                 warn!("{}", message);
             } else {
                 fail(&message);
             }
-        },
-        Err(err) => fail(&err)
+        }
+        Err(err) => fail(&err),
     }
 }
