@@ -47,7 +47,7 @@
 use colored::Colorize;
 use lazy_static::lazy_static;
 use log::{debug, error, info, trace, warn};
-use pulldown_cmark::{Event, LinkType, Options, Parser, Tag};
+use pulldown_cmark::{BrokenLink, Event, LinkType, Options, Parser, Tag};
 use regex::Regex;
 use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf};
@@ -341,16 +341,13 @@ pub fn check_broken_links(
         );
 
         // Count links without a target (like `[link name]`) as an error
-        // TODO: Find a way to not have to specify such a long explicit type name
-        let handle_missing_link_targets: &dyn for<'r, 's> Fn(
-            &'r str,
-            &'s str,
-        ) -> Option<(String, String)> = &|link, _| {
+        let mut handle_broken_links = |link: BrokenLink| {
             err_or_warn!(
                 "In '{}': Missing target for link '{}'",
                 canon.green(),
-                link.yellow()
+                link.reference.yellow()
             );
+
             None
         };
 
@@ -358,7 +355,7 @@ pub fn check_broken_links(
         let parser = Parser::new_with_broken_link_callback(
             &content,
             Options::all(),
-            Some(handle_missing_link_targets),
+            Some(&mut handle_broken_links),
         );
 
         for (event, range) in parser.into_offset_iter() {

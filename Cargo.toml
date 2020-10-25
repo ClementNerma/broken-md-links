@@ -8,13 +8,13 @@ edition = "2018"
 repository = "https://github.com/ClementNerma/broken-md-links"
 
 [dependencies]
-pulldown-cmark = { version = "0.7.2", default-features = false, features = ["simd"] }
+pulldown-cmark = { version = "0.8.0", default-features = false, features = ["simd"] }
 clap = "3.0.0-beta.1"
-log = "0.4.8"
+log = "0.4.11"
 fern = { version = "0.6.0", features = [ "colored" ] }
-regex = "1.3.9"
+regex = "1.4.1"
 lazy_static = "1.4.0"
-colored = "1.9.3"
+colored = "2.0.0"
 
 [[bin]]
 name = "broken-md-links"
