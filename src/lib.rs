@@ -35,12 +35,10 @@
 //! ```
 //! use broken_md_links::check_broken_links;
 //!
-//! fn main() {
-//!   match check_broken_links(Path::new("file.md"), false, false, false, &mut HashMap::new()) {
-//!     Ok(0) => println!("No broken link :D"),
-//!     Ok(errors @ _) => println!("There are {} broken links :(", errors),
-//!     Err(err) => println!("Something went wrong :( : {}", err)
-//!   }
+//! match check_broken_links(Path::new("file.md"), false, false, false, &mut HashMap::new()) {
+//!   Ok(0) => println!("No broken link :D"),
+//!   Ok(errors @ _) => println!("There are {} broken links :(", errors),
+//!   Err(err) => println!("Something went wrong :( : {}", err)
 //! }
 //! ```
 
@@ -172,7 +170,7 @@ pub fn generate_slugs(path: &Path) -> Result<Vec<String>, String> {
                     debug!("{}", format_msg!("found header: #{}", slug));
 
                     // Print a warning if the title is empty
-                    if header_str.trim().len() == 0 {
+                    if header_str.trim().is_empty() {
                         // We did not get a piece of text, which means this heading does not have a title
                         warn!(
                             "{}",

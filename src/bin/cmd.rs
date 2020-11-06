@@ -126,7 +126,7 @@ fn main() {
         &mut HashMap::new(),
     ) {
         Ok(0) => info!("OK."),
-        Ok(errors @ _) => {
+        Ok(errors) => {
             let message = format!(
                 "Found {} broken or invalid link{}!",
                 errors,
