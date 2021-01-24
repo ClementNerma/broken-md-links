@@ -65,10 +65,13 @@ lazy_static! {
 /// # Examples
 ///
 /// ```
+/// use std::path::Path;
+/// use broken_md_links::safe_canonicalize;
+///
 /// let path = Path::new("../a/b/../c");
 ///
-/// path.to_string_lossy();  // "../a/b/../c"
-/// safe_canonicalize(path); // "../a/c"
+/// assert_eq!(path.to_string_lossy(), "../a/b/../c");
+/// assert_eq!(safe_canonicalize(path), "../a/c");
 /// ```
 pub fn safe_canonicalize(path: &Path) -> String {
     // Components of the canonicalized path
@@ -107,8 +110,10 @@ pub fn safe_canonicalize(path: &Path) -> String {
 /// # Examples
 ///
 /// ```
-/// slugify("My super header") # "my-super-header"
-/// slugify("I love headers!") # "i-love-headers"
+/// use broken_md_links::slugify;
+///
+/// assert_eq!(slugify("My super header"), "my-super-header");
+/// assert_eq!(slugify("I love headers!"), "i-love-headers");
 /// ```
 pub fn slugify(header: &str) -> String {
     header
@@ -238,11 +243,15 @@ pub fn generate_slugs(path: &Path) -> Result<Vec<String>, String> {
 /// # Examples
 ///
 /// ```
+/// use std::path::Path;
+/// use std::collections::HashMap;
+/// use broken_md_links::check_broken_links;
+///
 /// // Single file
-/// assert_eq(check_broken_links(Path::new("file.md"), false, false, &mut HashMap::new()), Ok(0), "There are broken/invalid links :(");
+/// assert_eq!(check_broken_links(Path::new("file.md"), false, false, false, &mut HashMap::new()), Ok(0));
 ///
 /// // Directory
-/// assert_eq(check_broken_links(Path::new("dir/"), true, false, &mut HashMap::new()), Ok(0), "There are broken/invalid links :(");
+/// assert_eq!(check_broken_links(Path::new("dir/"), true, false, false, &mut HashMap::new()), Ok(0));
 pub fn check_broken_links(
     path: &Path,
     dir: bool,
