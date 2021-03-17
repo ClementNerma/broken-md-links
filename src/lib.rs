@@ -236,6 +236,8 @@ pub fn generate_slugs(path: &Path) -> Result<Vec<String>, String> {
 /// This cache is shared recursively through the `links_cache` argument. As it uses a specific format, it's recommanded to just pass a mutable
 ///  reference to an empty HashMap to this function, and not build your own one which may cause detection problems.
 ///
+/// If the `only_files` parameter is set, all links pointing to directories will be refused.
+///
 /// If the `no_errors` parameter is set, all broken/invalid link errors will be displayed as simple warnings (but errors will still be counted).
 ///
 /// The function returns an error is something goes wrong, or else the number of broken and invalid (without target) links.
@@ -248,14 +250,15 @@ pub fn generate_slugs(path: &Path) -> Result<Vec<String>, String> {
 /// use broken_md_links::check_broken_links;
 ///
 /// // Single file
-/// assert_eq!(check_broken_links(Path::new("file.md"), false, false, false, &mut HashMap::new()), Ok(0));
+/// assert_eq!(check_broken_links(Path::new("file.md"), false, false, false, false, &mut HashMap::new()), Ok(0));
 ///
 /// // Directory
-/// assert_eq!(check_broken_links(Path::new("dir/"), true, false, false, &mut HashMap::new()), Ok(0));
+/// assert_eq!(check_broken_links(Path::new("dir/"), true, false, false, false, &mut HashMap::new()), Ok(0));
 pub fn check_broken_links(
     path: &Path,
     dir: bool,
     ignore_header_links: bool,
+    only_files: bool,
     no_errors: bool,
     mut links_cache: &mut HashMap<PathBuf, Vec<String>>,
 ) -> Result<u64, String> {
@@ -308,6 +311,7 @@ pub fn check_broken_links(
                     &path,
                     true,
                     ignore_header_links,
+                    only_files,
                     no_errors,
                     &mut links_cache,
                 )?;
@@ -321,6 +325,7 @@ pub fn check_broken_links(
                                 &path,
                                 false,
                                 ignore_header_links,
+                                only_files,
                                 no_errors,
                                 links_cache,
                             )?;
@@ -408,17 +413,27 @@ pub fn check_broken_links(
 
                 let target_canon = safe_canonicalize(&target);
 
-                if std::fs::canonicalize(&target_canon).is_err() {
-                    err_or_warn!(
-                        "{}",
-                        format_msg!(
-                            "broken link found: path '{}' does not exist",
-                            target_canon.green()
-                        )
-                    );
-                    errors += 1;
-                    continue;
-                };
+                match std::fs::canonicalize(&target_canon) {
+                    Ok(path) => {
+                        if only_files && !path.is_file() {
+                            err_or_warn!("{}", format_msg!("invalid link found: path '{}' is a directory but only file links are allowed", target_canon.blue()));
+                            errors += 1;
+                            continue;
+                        }
+                    }
+
+                    Err(_) => {
+                        err_or_warn!(
+                            "{}",
+                            format_msg!(
+                                "broken link found: path '{}' does not exist",
+                                target_canon.green()
+                            )
+                        );
+                        errors += 1;
+                        continue;
+                    }
+                }
 
                 trace!("{}", format_msg!("valid link found: {}", target_canon));
 

@@ -35,6 +35,9 @@ struct Command {
            default_value="warn", about = "Verbosity level")]
     pub verbosity: String,
 
+    #[clap(short = 'f', long = "only-files", about = "Only accept links to files")]
+    pub only_files: bool,
+
     #[clap(
         long = "no-error",
         about = "Convert all broken/invalid links errors to warnings"
@@ -122,6 +125,7 @@ fn main() {
         input,
         args.recursive,
         args.ignore_header_links,
+        args.only_files,
         args.no_error,
         &mut HashMap::new(),
     ) {
