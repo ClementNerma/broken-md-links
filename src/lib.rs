@@ -375,7 +375,7 @@ pub fn check_broken_links(
                 ($($param: expr),*) => {{
                     // TODO: Optimize the computation of the line number
                     let line = content.chars().take(range.start).filter(|c| *c == '\n').count();
-                    format!("In '{}', line {}: {}", canon.green(), line + 1, format!($($param),*))
+                    format!("In {}{} {}", canon.green(), format!(":{}", line + 1).yellow(), format!($($param),*))
                 }}
             }
 
