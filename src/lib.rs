@@ -415,7 +415,7 @@ pub fn check_broken_links(
                             "{}",
                             format_msg!(
                                 "broken link found: path '{}' does not exist (or is not reachable)",
-                                target_canon
+                                target_canon.green()
                             )
                         );
                         errors += 1;
