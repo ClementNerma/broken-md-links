@@ -374,113 +374,110 @@ pub fn check_broken_links(
                 }}
             }
 
-            // Check links only
-            if let Event::End(Tag::Link(link_type, unsplit_target, _)) = event {
-                // Check inline links only (not URLs or e-mail addresses in autolinks for instance)
-                if let LinkType::Inline = link_type {
-                    // Get the link's target file and optionally its header
-                    let (target, header): (String, Option<String>) =
-                        match unsplit_target.chars().position(|c| c == '#') {
-                            Some(index) => (
-                                unsplit_target.chars().take(index).collect(),
-                                Some(unsplit_target.chars().skip(index + 1).collect()),
-                            ),
-                            None => (unsplit_target.into_string(), None),
-                        };
-
-                    // Don't care about URLs
-                    if target.starts_with("http://")
-                        || target.starts_with("https://")
-                        || target.starts_with("ftp://")
-                    {
-                        trace!("{}", format_msg!("found link to URL: {}", target));
-                        continue;
-                    }
-
-                    if EMAIL_REGEX.is_match(&target) {
-                        trace!("{}", format_msg!("found link to e-mail addres: {}", target));
-                        continue;
-                    }
-
-                    let target = if !target.is_empty() {
-                        path.parent().unwrap().join(Path::new(&target))
-                    } else {
-                        path.to_owned()
+            // Check inline links only (not URLs or e-mail addresses in autolinks for instance)
+            if let Event::End(Tag::Link(LinkType::Inline, unsplit_target, _)) = event {
+                // Get the link's target file and optionally its header
+                let (target, header): (String, Option<String>) =
+                    match unsplit_target.chars().position(|c| c == '#') {
+                        Some(index) => (
+                            unsplit_target.chars().take(index).collect(),
+                            Some(unsplit_target.chars().skip(index + 1).collect()),
+                        ),
+                        None => (unsplit_target.into_string(), None),
                     };
 
-                    let target_canon = safe_canonicalize(&target);
+                // Don't care about URLs
+                if target.starts_with("http://")
+                    || target.starts_with("https://")
+                    || target.starts_with("ftp://")
+                {
+                    trace!("{}", format_msg!("found link to URL: {}", target));
+                    continue;
+                }
 
-                    if !target.exists() {
-                        err_or_warn!(
-                            "{}",
-                            format_msg!(
-                                "broken link found: path '{}' does not exist",
-                                target_canon.green()
-                            )
-                        );
-                        errors += 1;
-                    } else {
-                        trace!("{}", format_msg!("valid link found: {}", target_canon));
+                if EMAIL_REGEX.is_match(&target) {
+                    trace!("{}", format_msg!("found link to e-mail addres: {}", target));
+                    continue;
+                }
 
-                        // If header links must be checked...
-                        if !ignore_header_links {
-                            // If the link points to a specific header...
-                            if let Some(header) = header {
-                                // Then the target must be a file
-                                if !target.is_file() {
-                                    err_or_warn!("{}", format_msg!("invalid header link found: path '{}' exists but is not a file", target_canon.green()));
-                                    errors += 1;
-                                } else {
-                                    debug!(
+                let target = if !target.is_empty() {
+                    path.parent().unwrap().join(Path::new(&target))
+                } else {
+                    path.to_owned()
+                };
+
+                let target_canon = safe_canonicalize(&target);
+
+                if !target.exists() {
+                    err_or_warn!(
+                        "{}",
+                        format_msg!(
+                            "broken link found: path '{}' does not exist",
+                            target_canon.green()
+                        )
+                    );
+                    errors += 1;
+                } else {
+                    trace!("{}", format_msg!("valid link found: {}", target_canon));
+
+                    // If header links must be checked...
+                    if !ignore_header_links {
+                        // If the link points to a specific header...
+                        if let Some(header) = header {
+                            // Then the target must be a file
+                            if !target.is_file() {
+                                err_or_warn!("{}", format_msg!("invalid header link found: path '{}' exists but is not a file", target_canon.green()));
+                                errors += 1;
+                            } else {
+                                debug!(
+                                    "{}",
+                                    format_msg!(
+                                        "now checking link '{}' from file '{}'",
+                                        header,
+                                        target_canon
+                                    )
+                                );
+
+                                // Canonicalize properly the target path to avoid irregularities in cache's keys
+                                //  like 'dir/../file.md' and 'file.md' which are identical but do not have the same Path representation
+                                let unified_target = target.canonicalize().unwrap();
+
+                                // If the target file is not already in cache...
+                                if !links_cache.contains_key(&unified_target) {
+                                    // 2. Push all slugs in the cache
+                                    links_cache.insert(
+                                        unified_target.clone(),
+                                        // 1. Get all its headers as slugs
+                                        // We do not use the fully canonicalized path to not force displaying an absolute path
+                                        generate_slugs(&target).map_err(|err| {
+                                            format!(
+                                                "failed to generate slugs for file '{}': {}",
+                                                target_canon.green(),
+                                                err
+                                            )
+                                        })?,
+                                    );
+                                }
+
+                                // Get the file's slugs from the cache
+                                let slugs = links_cache.get(&unified_target).unwrap();
+
+                                // Ensure the link points to an existing header
+                                if !slugs.contains(&header) {
+                                    err_or_warn!(
                                         "{}",
                                         format_msg!(
-                                            "now checking link '{}' from file '{}'",
-                                            header,
-                                            target_canon
+                                            "broken link found: header '{}' not found in '{}'",
+                                            header.yellow(),
+                                            target_canon.green()
                                         )
                                     );
-
-                                    // Canonicalize properly the target path to avoid irregularities in cache's keys
-                                    //  like 'dir/../file.md' and 'file.md' which are identical but do not have the same Path representation
-                                    let unified_target = target.canonicalize().unwrap();
-
-                                    // If the target file is not already in cache...
-                                    if !links_cache.contains_key(&unified_target) {
-                                        // 2. Push all slugs in the cache
-                                        links_cache.insert(
-                                            unified_target.clone(),
-                                            // 1. Get all its headers as slugs
-                                            // We do not use the fully canonicalized path to not force displaying an absolute path
-                                            generate_slugs(&target).map_err(|err| {
-                                                format!(
-                                                    "failed to generate slugs for file '{}': {}",
-                                                    target_canon.green(),
-                                                    err
-                                                )
-                                            })?,
-                                        );
-                                    }
-
-                                    // Get the file's slugs from the cache
-                                    let slugs = links_cache.get(&unified_target).unwrap();
-
-                                    // Ensure the link points to an existing header
-                                    if !slugs.contains(&header) {
-                                        err_or_warn!(
-                                            "{}",
-                                            format_msg!(
-                                                "broken link found: header '{}' not found in '{}'",
-                                                header.yellow(),
-                                                target_canon.green()
-                                            )
-                                        );
-                                        errors += 1;
-                                    } else {
-                                        trace!(
-                                            "{}",
-                                            format_msg!("valid header link found: {}", header)
-                                        );
-                                    }
+                                    errors += 1;
+                                } else {
+                                    trace!(
+                                        "{}",
+                                        format_msg!("valid header link found: {}", header)
+                                    );
                                 }
                             }
                         }
