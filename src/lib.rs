@@ -408,7 +408,22 @@ pub fn check_broken_links(
 
                 let target_canon = safe_canonicalize(&target);
 
-                if !target.exists() {
+                let target_full = match std::fs::canonicalize(&target_canon) {
+                    Ok(path) => path,
+                    Err(_) => {
+                        err_or_warn!(
+                            "{}",
+                            format_msg!(
+                                "broken link found: path '{}' does not exist (or is not reachable)",
+                                target_canon
+                            )
+                        );
+                        errors += 1;
+                        continue;
+                    }
+                };
+
+                if !target_full.exists() {
                     err_or_warn!(
                         "{}",
                         format_msg!(
