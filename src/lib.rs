@@ -260,7 +260,7 @@ pub fn check_broken_links(
     ignore_header_links: bool,
     only_files: bool,
     no_errors: bool,
-    mut links_cache: &mut HashMap<PathBuf, Vec<String>>,
+    links_cache: &mut HashMap<PathBuf, Vec<String>>,
 ) -> Result<u64, String> {
     /// Display a broken/invalid link error
     macro_rules! err_or_warn {
@@ -313,7 +313,7 @@ pub fn check_broken_links(
                     ignore_header_links,
                     only_files,
                     no_errors,
-                    &mut links_cache,
+                    links_cache,
                 )?;
             } else if file_type.is_file() {
                 // Only check ".md" files
