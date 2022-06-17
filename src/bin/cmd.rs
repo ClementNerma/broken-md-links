@@ -1,5 +1,5 @@
 use broken_md_links::check_broken_links;
-use clap::Clap;
+use clap::Parser;
 use colored::Colorize;
 use fern::colors::{Color, ColoredLevelConfig};
 use log::{error, info, warn, Level, LevelFilter};
@@ -8,39 +8,35 @@ use std::path::Path;
 use std::time::Instant;
 
 /// Command
-#[derive(Clap)]
-#[clap(
-    version = "1.0",
-    author = "Clément Nerma <clement.nerma@gmail.com>",
-    about = "Detect broken links in markdown files"
-)]
+#[derive(Parser)]
+#[clap(author, version, about, long_about = None)]
 struct Command {
-    #[clap(index = 1, about = "Input file or directory")]
+    #[clap(index = 1, help = "Input file or directory")]
     pub input: String,
 
     #[clap(
         short = 'r',
         long = "recursive",
-        about = "Check all files in the input directory"
+        help = "Check all files in the input directory"
     )]
     pub recursive: bool,
 
     #[clap(
         long = "ignore-header-links",
-        about = "Do not check if headers are valids in links (e.g. 'document.md#some-header')"
+        help = "Do not check if headers are valids in links (e.g. 'document.md#some-header')"
     )]
     pub ignore_header_links: bool,
 
     #[clap(short = 'v', long = "verbosity", possible_values=&["silent", "errors", "warn", "info", "verbose", "debug"],
-           default_value="warn", about = "Verbosity level")]
+           default_value="warn", help = "Verbosity level")]
     pub verbosity: String,
 
-    #[clap(short = 'f', long = "only-files", about = "Only accept links to files")]
+    #[clap(short = 'f', long = "only-files", help = "Only accept links to files")]
     pub only_files: bool,
 
     #[clap(
         long = "no-error",
-        about = "Convert all broken/invalid links errors to warnings"
+        help = "Convert all broken/invalid links errors to warnings"
     )]
     pub no_error: bool,
 }

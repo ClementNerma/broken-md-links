@@ -169,9 +169,9 @@ pub fn generate_slugs(path: &Path) -> Result<Vec<String>, String> {
         if let Some(ref mut header_str) = header {
             match event {
                 // Event indicating the header is now complete
-                Event::End(Tag::Heading(_)) => {
+                Event::End(Tag::Heading(..)) => {
                     // Get its slug
-                    let slug = slugify(&header_str);
+                    let slug = slugify(header_str);
                     debug!("{}", format_msg!("found header: #{}", slug));
 
                     // Print a warning if the title is empty
@@ -214,7 +214,7 @@ pub fn generate_slugs(path: &Path) -> Result<Vec<String>, String> {
             }
         }
         // If we encounted the beginning of a heading...
-        else if let Event::Start(Tag::Heading(_)) = event {
+        else if let Event::Start(Tag::Heading(..)) = event {
             // Expect to get the related title just after
             header = Some(String::new())
         }
