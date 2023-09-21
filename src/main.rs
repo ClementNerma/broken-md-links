@@ -50,7 +50,7 @@ fn inner_main() -> Result<()> {
     } = Command::parse();
 
     // Initialize the logger
-    env_logger::builder().filter_level(verbosity).build();
+    env_logger::builder().filter_level(verbosity).init();
 
     let input = Path::new(&input);
 
@@ -74,9 +74,10 @@ fn inner_main() -> Result<()> {
                 err.len(),
                 if err.len() > 1 { "s" } else { "" },
                 err.into_iter()
-                    .map(|DetectedBrokenLink { file, error }| format!(
-                        "\n* In {}: {}",
+                    .map(|DetectedBrokenLink { file, line, error }| format!(
+                        "\n* In {}:{}: {}",
                         file.to_string_lossy().bright_magenta(),
+                        line.to_string().bright_cyan(),
                         error.bright_yellow()
                     ))
                     .collect::<String>()

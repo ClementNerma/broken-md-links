@@ -219,6 +219,7 @@ pub type FileLinksCache = HashMap<PathBuf, Vec<String>>;
 /// Detected broken link
 pub struct DetectedBrokenLink {
     pub file: PathBuf,
+    pub line: usize,
     pub error: String,
 }
 
@@ -360,11 +361,11 @@ pub fn check_file_broken_links(
     );
 
     for (event, range) in parser.into_offset_iter() {
-        macro_rules! format_msg {
+        macro_rules! make_err {
                 ($($param: expr),*) => {{
                     // TODO: Optimize the computation of the line number
                     let line = content.chars().take(range.start).filter(|c| *c == '\n').count();
-                    format!("In {}{} {}", canon.green(), format!(":{}", line + 1).yellow(), format!($($param),*))
+                    DetectedBrokenLink { file: path.to_path_buf(), line: line + 1, error: format!($($param),*) }
                 }}
             }
 
@@ -385,12 +386,12 @@ pub fn check_file_broken_links(
                 || target.starts_with("https://")
                 || target.starts_with("ftp://")
             {
-                trace!("{}", format_msg!("found link to URL: {}", target));
+                trace!("found link to URL: {target}");
                 continue;
             }
 
             if EMAIL_REGEX.is_match(&target) {
-                trace!("{}", format_msg!("found link to e-mail addres: {}", target));
+                trace!("found link to e-mail addres: {target}");
                 continue;
             }
 
@@ -405,13 +406,13 @@ pub fn check_file_broken_links(
             match std::fs::canonicalize(&target_canon) {
                 Ok(path) => {
                     if *disallow_dir_links && !path.is_file() {
-                        errors.push(format_msg!("invalid link found: path '{}' is a directory but only file links are allowed", target_canon.blue()));
+                        errors.push(make_err!("invalid link found: path '{}' is a directory but only file links are allowed", target_canon.blue()));
                         continue;
                     }
                 }
 
                 Err(_) => {
-                    errors.push(format_msg!(
+                    errors.push(make_err!(
                         "broken link found: path '{}' does not exist",
                         target_canon.green()
                     ));
@@ -419,7 +420,7 @@ pub fn check_file_broken_links(
                 }
             }
 
-            trace!("{}", format_msg!("valid link found: {}", target_canon));
+            trace!("valid link found: {}", target_canon);
 
             // If header links must be checked...
             if !ignore_header_links {
@@ -427,18 +428,14 @@ pub fn check_file_broken_links(
                 if let Some(header) = header {
                     // Then the target must be a file
                     if !target.is_file() {
-                        errors.push(format_msg!(
+                        errors.push(make_err!(
                             "invalid header link found: path '{}' exists but is not a file",
                             target_canon.green()
                         ));
                     } else {
                         debug!(
-                            "{}",
-                            format_msg!(
-                                "now checking link '{}' from file '{}'",
-                                header,
-                                target_canon
-                            )
+                            "now checking link '{}' from file '{}'",
+                            header, target_canon
                         );
 
                         // Canonicalize properly the target path to avoid irregularities in cache's keys
@@ -467,13 +464,13 @@ pub fn check_file_broken_links(
 
                         // Ensure the link points to an existing header
                         if !slugs.contains(&header) {
-                            errors.push(format_msg!(
+                            errors.push(make_err!(
                                 "broken link found: header '{}' not found in '{}'",
                                 header.yellow(),
                                 target_canon.green()
                             ));
                         } else {
-                            trace!("{}", format_msg!("valid header link found: {}", header));
+                            trace!("valid header link found: {}", header);
                         }
                     }
                 }
@@ -481,11 +478,5 @@ pub fn check_file_broken_links(
         }
     }
 
-    Ok(errors
-        .into_iter()
-        .map(|error| DetectedBrokenLink {
-            file: path.to_path_buf(),
-            error,
-        })
-        .collect())
+    Ok(errors)
 }
