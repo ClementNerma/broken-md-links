@@ -2,20 +2,19 @@
 name = "broken-md-links"
 description = "A command-line tool and library to detect broken links in Markdown files"
 license = "Apache-2.0"
-version = "1.2.1"
+version = "2.0.0"
 authors = ["Clément Nerma <clement.nerma@gmail.com>"]
 edition = "2018"
 repository = "https://github.com/ClementNerma/broken-md-links"
 
 [dependencies]
-pulldown-cmark = { version = "0.9.1", default-features = false, features = ["simd"] }
-clap = { version = "3.1.18", features = ["derive"] }
-log = "0.4.17"
-fern = { version = "0.6.1", features = [ "colored" ] }
-regex = "1.5.6"
-lazy_static = "1.4.0"
-colored = "2.0.0"
-
-[[bin]]
-name = "broken-md-links"
-path = "src/bin/cmd.rs"
+pulldown-cmark = { version = "0.9.3", default-features = false, features = [
+    "simd",
+] }
+clap = { version = "4.4.4", features = ["derive"] }
+log = "0.4.20"
+regex = "1.9.5"
+env_logger = "0.10.0"
+anyhow = "1.0.75"
+colored = "2.0.4"
+once_cell = "1.18.0"

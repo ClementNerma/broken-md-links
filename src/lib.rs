@@ -14,7 +14,7 @@
 //! Check a whole directory:
 //!
 //! ```shell
-//! broken-md-links dir/ -r
+//! broken-md-links dir/
 //! ```
 //!
 //! ### Output
@@ -27,53 +27,29 @@
 //! * `-v info`: display the list of analyzed files as well
 //! * `-v verbose`: display detailed informations
 //! * `-v trace`: display debug informations
-//!
-//! Additionally, the `--no-error` flag converst all broken/invalid link errors to warnings.
-//!
-//! ## Library usage
-//!
-//! ```
-//! use broken_md_links::check_broken_links;
-//!
-//! match check_broken_links(Path::new("file.md"), false, false, false, &mut HashMap::new()) {
-//!   Ok(0) => println!("No broken link :D"),
-//!   Ok(errors @ _) => println!("There are {} broken links :(", errors),
-//!   Err(err) => println!("Something went wrong :( : {}", err)
-//! }
-//! ```
+
+#![forbid(unsafe_code)]
+#![forbid(unused_must_use)]
 
 use colored::Colorize;
-use lazy_static::lazy_static;
 use log::{debug, error, info, trace, warn};
+use once_cell::sync::Lazy;
 use pulldown_cmark::{BrokenLink, Event, LinkType, Options, Parser, Tag};
 use regex::Regex;
 use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf};
 
-lazy_static! {
-    static ref EMAIL_REGEX: Regex = Regex::new("\
+static EMAIL_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new("\
         (?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|\"\
         (?:[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f\\x21\\x23-\\x5b\\x5d-\\x7f]|\\\\[\\x01-\\x09\\x0b\\x0c\\x0e-\\x7f])*\")@\
         (?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\\[\
         (?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\\.){3}(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9-]*[a-z0-9]:\
         (?:[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f\\x21-\\x5a\\x53-\\x7f]|\\\\[\\x01-\\x09\\x0b\\x0c\\x0e-\\x7f])+)\\])"
-    ).unwrap();
-}
+    ).unwrap()
+});
 
-/// Canonicalize a path and display it as a lossy string
-///
-/// # Examples
-///
-/// ```
-/// use std::path::Path;
-/// use broken_md_links::safe_canonicalize;
-///
-/// let path = Path::new("../a/b/../c");
-///
-/// assert_eq!(path.to_string_lossy(), "../a/b/../c");
-/// assert_eq!(safe_canonicalize(path), "../a/c");
-/// ```
-pub fn safe_canonicalize(path: &Path) -> String {
+fn simplify_path(path: &Path) -> String {
     // Components of the canonicalized path
     let mut out = vec![];
 
@@ -129,7 +105,7 @@ pub fn slugify(header: &str) -> String {
 /// Returns an error message if the operation failed for any reason
 pub fn generate_slugs(path: &Path) -> Result<Vec<String>, String> {
     // Get the canonicalized path for display
-    let canon = safe_canonicalize(path);
+    let canon = simplify_path(path);
 
     debug!("Generating slugs for file: {}", canon);
 
@@ -224,6 +200,28 @@ pub fn generate_slugs(path: &Path) -> Result<Vec<String>, String> {
     Ok(headers)
 }
 
+/// Broken links checker options
+#[derive(Debug, Clone, Copy)]
+pub struct CheckerOptions {
+    pub ignore_header_links: bool,
+    pub disallow_dir_links: bool,
+}
+
+/// Checker error
+pub enum CheckerError {
+    Io(String),
+    BrokenLinks(Vec<DetectedBrokenLink>),
+}
+
+/// Markdown file links cache
+pub type FileLinksCache = HashMap<PathBuf, Vec<String>>;
+
+/// Detected broken link
+pub struct DetectedBrokenLink {
+    pub file: PathBuf,
+    pub error: String,
+}
+
 /// Check broken links in a Markdown file or directory
 ///
 /// The input `path` will be checked recursively as a directory if `dir` is set to `true`, else as a single file.
@@ -236,142 +234,133 @@ pub fn generate_slugs(path: &Path) -> Result<Vec<String>, String> {
 /// This cache is shared recursively through the `links_cache` argument. As it uses a specific format, it's recommanded to just pass a mutable
 ///  reference to an empty HashMap to this function, and not build your own one which may cause detection problems.
 ///
-/// If the `only_files` parameter is set, all links pointing to directories will be refused.
-///
-/// If the `no_errors` parameter is set, all broken/invalid link errors will be displayed as simple warnings (but errors will still be counted).
-///
 /// The function returns an error is something goes wrong, or else the number of broken and invalid (without target) links.
-///
-/// # Examples
-///
-/// ```
-/// use std::path::Path;
-/// use std::collections::HashMap;
-/// use broken_md_links::check_broken_links;
-///
-/// // Single file
-/// assert_eq!(check_broken_links(Path::new("file.md"), false, false, false, false, &mut HashMap::new()), Ok(0));
-///
-/// // Directory
-/// assert_eq!(check_broken_links(Path::new("dir/"), true, false, false, false, &mut HashMap::new()), Ok(0));
 pub fn check_broken_links(
     path: &Path,
-    dir: bool,
-    ignore_header_links: bool,
-    only_files: bool,
-    no_errors: bool,
-    links_cache: &mut HashMap<PathBuf, Vec<String>>,
-) -> Result<u64, String> {
-    /// Display a broken/invalid link error
-    macro_rules! err_or_warn {
-        ($($arg: expr),*) => {
-            if no_errors {
-                warn!($($arg),*);
-            } else {
-                error!($($arg),*);
-            }
-        }
+    options: CheckerOptions,
+    links_cache: &mut FileLinksCache,
+) -> Result<(), CheckerError> {
+    // Detect broken links
+    let errors = if path.is_dir() {
+        check_broken_links_in_dir(path, &options, links_cache).map_err(CheckerError::Io)?
+    } else {
+        check_file_broken_links(path, &options, links_cache).map_err(CheckerError::Io)?
+    };
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(CheckerError::BrokenLinks(errors))
     }
+}
 
+pub fn check_broken_links_in_dir(
+    path: &Path,
+    options: &CheckerOptions,
+    links_cache: &mut FileLinksCache,
+) -> Result<Vec<DetectedBrokenLink>, String> {
     // Get the canonicalized path for display
-    let canon = safe_canonicalize(path);
+    let canon = simplify_path(path);
 
-    // Count errors
-    let mut errors = 0;
+    debug!("Analyzing directory: {}", canon);
 
-    if dir {
-        debug!("Analyzing directory: {}", canon);
+    let dir_iter = path.read_dir().map_err(|err| {
+        format!(
+            "Failed to read input directory at '{}': {}",
+            canon.green(),
+            err
+        )
+    })?;
 
-        for item in path.read_dir().map_err(|err| {
+    let mut errors = vec![];
+
+    for item in dir_iter {
+        let item = item.map_err(|err| {
             format!(
-                "Failed to read input directory at '{}': {}",
+                "Failed to get item from directory at '{}': {}",
                 canon.green(),
                 err
             )
-        })? {
-            let item = item.map_err(|err| {
-                format!(
-                    "Failed to get item from directory at '{}': {}",
-                    canon.green(),
-                    err
-                )
-            })?;
-            let path = item.path();
-            let file_type = item.file_type().map_err(|err| {
-                format!(
-                    "Failed to read file type of item at '{}': {}",
-                    canon.green(),
-                    err
-                )
-            })?;
+        })?;
+        let path = item.path();
+        let file_type = item.file_type().map_err(|err| {
+            format!(
+                "Failed to read file type of item at '{}': {}",
+                canon.green(),
+                err
+            )
+        })?;
 
-            if file_type.is_dir() {
-                // Check broken links recursively
-                errors += check_broken_links(
-                    &path,
-                    true,
-                    ignore_header_links,
-                    only_files,
-                    no_errors,
-                    links_cache,
-                )?;
-            } else if file_type.is_file() {
-                // Only check ".md" files
-                if let Some(ext) = path.extension() {
-                    if let Some(ext) = ext.to_str() {
-                        if ext == "md" {
-                            // Check this Markdown file
-                            errors += check_broken_links(
-                                &path,
-                                false,
-                                ignore_header_links,
-                                only_files,
-                                no_errors,
-                                links_cache,
-                            )?;
-                        }
+        if file_type.is_dir() {
+            // Check broken links recursively
+            errors.append(&mut check_broken_links_in_dir(&path, options, links_cache)?);
+        } else if file_type.is_file() {
+            // Only check ".md" files
+            if let Some(ext) = path.extension() {
+                if let Some(ext) = ext.to_str() {
+                    if ext.to_ascii_lowercase() == "md" {
+                        // Check this Markdown file
+                        errors.append(&mut check_file_broken_links(&path, options, links_cache)?);
                     }
                 }
-            } else {
-                warn!(
-                    "Item at path '{}' is neither a file nor a directory so it will be ignored",
-                    canon
-                );
             }
-        }
-    } else {
-        // Treat input as a file
-        info!("Analyzing: {}", canon);
-
-        let content = std::fs::read_to_string(path)
-            .map_err(|err| format!("Failed to read file at '{}': {}", canon.green(), err))?;
-
-        trace!(
-            "In '{}': just read file, which is {} bytes long.",
-            canon,
-            content.len()
-        );
-
-        // Count links without a target (like `[link name]`) as an error
-        let mut handle_broken_links = |link: BrokenLink| {
-            err_or_warn!(
-                "In '{}': Missing target for link '{}'",
-                canon.green(),
-                link.reference.yellow()
+        } else {
+            warn!(
+                "Item at path '{}' is neither a file nor a directory so it will be ignored",
+                canon
             );
+        }
+    }
 
-            None
-        };
+    Ok(errors)
+}
 
-        // Create a pull-down parser
-        let parser = Parser::new_with_broken_link_callback(
-            &content,
-            Options::all(),
-            Some(&mut handle_broken_links),
+pub fn check_file_broken_links(
+    path: &Path,
+    options: &CheckerOptions,
+    links_cache: &mut FileLinksCache,
+) -> Result<Vec<DetectedBrokenLink>, String> {
+    // Get the canonicalized path for display
+    let canon = simplify_path(path);
+
+    info!("Analyzing: {}", canon);
+
+    let CheckerOptions {
+        ignore_header_links,
+        disallow_dir_links,
+    } = &options;
+
+    let mut errors = vec![];
+
+    let content = std::fs::read_to_string(path)
+        .map_err(|err| format!("Failed to read file at '{}': {}", canon.green(), err))?;
+
+    trace!(
+        "In '{}': just read file, which is {} bytes long.",
+        canon,
+        content.len()
+    );
+
+    // Count links without a target (like `[link name]`) as an error
+    let mut handle_broken_links = |link: BrokenLink| {
+        error!(
+            "In '{}': Missing target for link '{}'",
+            canon.green(),
+            link.reference.yellow()
         );
 
-        for (event, range) in parser.into_offset_iter() {
-            macro_rules! format_msg {
+        None
+    };
+
+    // Create a pull-down parser
+    let parser = Parser::new_with_broken_link_callback(
+        &content,
+        Options::all(),
+        Some(&mut handle_broken_links),
+    );
+
+    for (event, range) in parser.into_offset_iter() {
+        macro_rules! format_msg {
                 ($($param: expr),*) => {{
                     // TODO: Optimize the computation of the line number
                     let line = content.chars().take(range.start).filter(|c| *c == '\n').count();
@@ -379,126 +368,112 @@ pub fn check_broken_links(
                 }}
             }
 
-            // Check inline links only (not URLs or e-mail addresses in autolinks for instance)
-            if let Event::End(Tag::Link(LinkType::Inline, unsplit_target, _)) = event {
-                // Get the link's target file and optionally its header
-                let (target, header): (String, Option<String>) =
-                    match unsplit_target.chars().position(|c| c == '#') {
-                        Some(index) => (
-                            unsplit_target.chars().take(index).collect(),
-                            Some(unsplit_target.chars().skip(index + 1).collect()),
-                        ),
-                        None => (unsplit_target.into_string(), None),
-                    };
-
-                // Don't care about URLs
-                if target.starts_with("http://")
-                    || target.starts_with("https://")
-                    || target.starts_with("ftp://")
-                {
-                    trace!("{}", format_msg!("found link to URL: {}", target));
-                    continue;
-                }
-
-                if EMAIL_REGEX.is_match(&target) {
-                    trace!("{}", format_msg!("found link to e-mail addres: {}", target));
-                    continue;
-                }
-
-                let target = if !target.is_empty() {
-                    path.parent().unwrap().join(Path::new(&target))
-                } else {
-                    path.to_owned()
+        // Check inline links only (not URLs or e-mail addresses in autolinks for instance)
+        if let Event::End(Tag::Link(LinkType::Inline, unsplit_target, _)) = event {
+            // Get the link's target file and optionally its header
+            let (target, header): (String, Option<String>) =
+                match unsplit_target.chars().position(|c| c == '#') {
+                    Some(index) => (
+                        unsplit_target.chars().take(index).collect(),
+                        Some(unsplit_target.chars().skip(index + 1).collect()),
+                    ),
+                    None => (unsplit_target.into_string(), None),
                 };
 
-                let target_canon = safe_canonicalize(&target);
+            // Don't care about URLs
+            if target.starts_with("http://")
+                || target.starts_with("https://")
+                || target.starts_with("ftp://")
+            {
+                trace!("{}", format_msg!("found link to URL: {}", target));
+                continue;
+            }
 
-                match std::fs::canonicalize(&target_canon) {
-                    Ok(path) => {
-                        if only_files && !path.is_file() {
-                            err_or_warn!("{}", format_msg!("invalid link found: path '{}' is a directory but only file links are allowed", target_canon.blue()));
-                            errors += 1;
-                            continue;
-                        }
-                    }
+            if EMAIL_REGEX.is_match(&target) {
+                trace!("{}", format_msg!("found link to e-mail addres: {}", target));
+                continue;
+            }
 
-                    Err(_) => {
-                        err_or_warn!(
-                            "{}",
-                            format_msg!(
-                                "broken link found: path '{}' does not exist",
-                                target_canon.green()
-                            )
-                        );
-                        errors += 1;
+            let target = if !target.is_empty() {
+                path.parent().unwrap().join(Path::new(&target))
+            } else {
+                path.to_owned()
+            };
+
+            let target_canon = simplify_path(&target);
+
+            match std::fs::canonicalize(&target_canon) {
+                Ok(path) => {
+                    if *disallow_dir_links && !path.is_file() {
+                        errors.push(format_msg!("invalid link found: path '{}' is a directory but only file links are allowed", target_canon.blue()));
                         continue;
                     }
                 }
 
-                trace!("{}", format_msg!("valid link found: {}", target_canon));
+                Err(_) => {
+                    errors.push(format_msg!(
+                        "broken link found: path '{}' does not exist",
+                        target_canon.green()
+                    ));
+                    continue;
+                }
+            }
 
-                // If header links must be checked...
-                if !ignore_header_links {
-                    // If the link points to a specific header...
-                    if let Some(header) = header {
-                        // Then the target must be a file
-                        if !target.is_file() {
-                            err_or_warn!(
-                                "{}",
-                                format_msg!(
-                                    "invalid header link found: path '{}' exists but is not a file",
-                                    target_canon.green()
-                                )
-                            );
-                            errors += 1;
-                        } else {
-                            debug!(
-                                "{}",
-                                format_msg!(
-                                    "now checking link '{}' from file '{}'",
-                                    header,
-                                    target_canon
-                                )
-                            );
+            trace!("{}", format_msg!("valid link found: {}", target_canon));
 
-                            // Canonicalize properly the target path to avoid irregularities in cache's keys
-                            //  like 'dir/../file.md' and 'file.md' which are identical but do not have the same Path representation
-                            let unified_target = target.canonicalize().unwrap();
+            // If header links must be checked...
+            if !ignore_header_links {
+                // If the link points to a specific header...
+                if let Some(header) = header {
+                    // Then the target must be a file
+                    if !target.is_file() {
+                        errors.push(format_msg!(
+                            "invalid header link found: path '{}' exists but is not a file",
+                            target_canon.green()
+                        ));
+                    } else {
+                        debug!(
+                            "{}",
+                            format_msg!(
+                                "now checking link '{}' from file '{}'",
+                                header,
+                                target_canon
+                            )
+                        );
 
-                            // If the target file is not already in cache...
-                            if !links_cache.contains_key(&unified_target) {
-                                // 2. Push all slugs in the cache
-                                links_cache.insert(
-                                    unified_target.clone(),
-                                    // 1. Get all its headers as slugs
-                                    // We do not use the fully canonicalized path to not force displaying an absolute path
-                                    generate_slugs(&target).map_err(|err| {
-                                        format!(
-                                            "failed to generate slugs for file '{}': {}",
-                                            target_canon.green(),
-                                            err
-                                        )
-                                    })?,
-                                );
-                            }
+                        // Canonicalize properly the target path to avoid irregularities in cache's keys
+                        //  like 'dir/../file.md' and 'file.md' which are identical but do not have the same Path representation
+                        let unified_target = target.canonicalize().unwrap();
 
-                            // Get the file's slugs from the cache
-                            let slugs = links_cache.get(&unified_target).unwrap();
-
-                            // Ensure the link points to an existing header
-                            if !slugs.contains(&header) {
-                                err_or_warn!(
-                                    "{}",
-                                    format_msg!(
-                                        "broken link found: header '{}' not found in '{}'",
-                                        header.yellow(),
-                                        target_canon.green()
+                        // If the target file is not already in cache...
+                        if !links_cache.contains_key(&unified_target) {
+                            // 2. Push all slugs in the cache
+                            links_cache.insert(
+                                unified_target.clone(),
+                                // 1. Get all its headers as slugs
+                                // We do not use the fully canonicalized path to not force displaying an absolute path
+                                generate_slugs(&target).map_err(|err| {
+                                    format!(
+                                        "failed to generate slugs for file '{}': {}",
+                                        target_canon.green(),
+                                        err
                                     )
-                                );
-                                errors += 1;
-                            } else {
-                                trace!("{}", format_msg!("valid header link found: {}", header));
-                            }
+                                })?,
+                            );
+                        }
+
+                        // Get the file's slugs from the cache
+                        let slugs = links_cache.get(&unified_target).unwrap();
+
+                        // Ensure the link points to an existing header
+                        if !slugs.contains(&header) {
+                            errors.push(format_msg!(
+                                "broken link found: header '{}' not found in '{}'",
+                                header.yellow(),
+                                target_canon.green()
+                            ));
+                        } else {
+                            trace!("{}", format_msg!("valid header link found: {}", header));
                         }
                     }
                 }
@@ -506,6 +481,11 @@ pub fn check_broken_links(
         }
     }
 
-    // Everything went fine :D
-    Ok(errors)
+    Ok(errors
+        .into_iter()
+        .map(|error| DetectedBrokenLink {
+            file: path.to_path_buf(),
+            error,
+        })
+        .collect())
 }
