@@ -1,14 +1,18 @@
 #![forbid(unsafe_code)]
 #![forbid(unused_must_use)]
+#![warn(unused_crate_dependencies)]
+
+use std::{collections::HashMap, fmt::Write, path::Path, process::ExitCode};
 
 use anyhow::{bail, Result};
 use broken_md_links::{check_broken_links, CheckerError, CheckerOptions, DetectedBrokenLink};
 use clap::Parser;
 use colored::Colorize;
 use log::{error, LevelFilter};
-use std::collections::HashMap;
-use std::path::Path;
-use std::process::ExitCode;
+
+// Avoid triggering Clappy warning for dependencies that are used in the library
+use pulldown_cmark as _;
+use regex as _;
 
 /// Command
 #[derive(Parser)]
@@ -73,14 +77,21 @@ fn inner_main() -> Result<()> {
                 "Detected {} broken link{}:{}",
                 err.len(),
                 if err.len() > 1 { "s" } else { "" },
-                err.into_iter()
-                    .map(|DetectedBrokenLink { file, line, error }| format!(
-                        "\n* In {}:{}: {}",
-                        file.to_string_lossy().bright_magenta(),
-                        line.to_string().bright_cyan(),
-                        error.bright_yellow()
-                    ))
-                    .collect::<String>()
+                err.into_iter().fold(
+                    String::new(),
+                    |mut output, DetectedBrokenLink { file, line, error }| {
+                        write!(
+                            output,
+                            "\n* In {}:{}: {}",
+                            file.to_string_lossy().bright_magenta(),
+                            line.to_string().bright_cyan(),
+                            error.bright_yellow()
+                        )
+                        .unwrap();
+
+                        output
+                    }
+                )
             ),
         },
     }
