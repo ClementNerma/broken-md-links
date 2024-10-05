@@ -33,13 +33,13 @@
 
 use colored::Colorize;
 use log::{debug, error, info, trace, warn};
-use once_cell::sync::Lazy;
-use pulldown_cmark::{BrokenLink, Event, LinkType, Options, Parser, Tag};
+use pulldown_cmark::{BrokenLink, Event, LinkType, Options, Parser, Tag, TagEnd};
 use regex::Regex;
 use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf};
+use std::sync::LazyLock;
 
-static EMAIL_REGEX: Lazy<Regex> = Lazy::new(|| {
+static EMAIL_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new("\
         (?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|\"\
         (?:[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f\\x21\\x23-\\x5b\\x5d-\\x7f]|\\\\[\\x01-\\x09\\x0b\\x0c\\x0e-\\x7f])*\")@\
@@ -145,7 +145,7 @@ pub fn generate_slugs(path: &Path) -> Result<Vec<String>, String> {
         if let Some(ref mut header_str) = header {
             match event {
                 // Event indicating the header is now complete
-                Event::End(Tag::Heading(..)) => {
+                Event::End(TagEnd::Heading { .. }) => {
                     // Get its slug
                     let slug = slugify(header_str);
                     debug!("{}", format_msg!("found header: #{}", slug));
@@ -182,7 +182,11 @@ pub fn generate_slugs(path: &Path) -> Result<Vec<String>, String> {
                 | Event::SoftBreak
                 | Event::HardBreak
                 | Event::Rule
-                | Event::TaskListMarker(_) => {}
+                | Event::TaskListMarker(_)
+                | Event::InlineMath(_)
+                | Event::DisplayMath(_)
+                | Event::InlineHtml(_) => {}
+
                 Event::Text(text)
                 | Event::Code(text)
                 | Event::Html(text)
@@ -190,7 +194,7 @@ pub fn generate_slugs(path: &Path) -> Result<Vec<String>, String> {
             }
         }
         // If we encounted the beginning of a heading...
-        else if let Event::Start(Tag::Heading(..)) = event {
+        else if let Event::Start(Tag::Heading { .. }) = event {
             // Expect to get the related title just after
             header = Some(String::new())
         }
@@ -370,15 +374,21 @@ pub fn check_file_broken_links(
             }
 
         // Check inline links only (not URLs or e-mail addresses in autolinks for instance)
-        if let Event::End(Tag::Link(LinkType::Inline, unsplit_target, _)) = event {
+        if let Event::Start(Tag::Link {
+            link_type: LinkType::Inline,
+            dest_url,
+            title: _,
+            id: _,
+        }) = event
+        {
             // Get the link's target file and optionally its header
             let (target, header): (String, Option<String>) =
-                match unsplit_target.chars().position(|c| c == '#') {
+                match dest_url.chars().position(|c| c == '#') {
                     Some(index) => (
-                        unsplit_target.chars().take(index).collect(),
-                        Some(unsplit_target.chars().skip(index + 1).collect()),
+                        dest_url.chars().take(index).collect(),
+                        Some(dest_url.chars().skip(index + 1).collect()),
                     ),
-                    None => (unsplit_target.into_string(), None),
+                    None => (dest_url.into_string(), None),
                 };
 
             // Don't care about URLs
